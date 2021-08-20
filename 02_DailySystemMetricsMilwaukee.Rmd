@@ -1,0 +1,297 @@
+---
+title: "Daily System Metrics - Milwaukee"
+output:
+  html_document: default
+---
+<style>
+body {
+    position: absolute;
+    left: 0px;}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{css, echo = FALSE}
+
+ table {
+    margin-left: 0px;
+    margin-right: auto;
+ }
+
+td:second-child {
+  background-color: yellow;
+  text-align:left;
+  align: left;
+}
+th {
+  border-top: thin solid black;
+  border-bottom: thin solid black;
+}
+
+
+```
+
+```{r color, echo=FALSE, message=FALSE, warning=FALSE}
+library(lubridate)
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+      x)
+  } else x
+}
+```
+
+**Description:** This report provides a daily snapshot of key system metrics for Milwaukee and Milwaukee Metro areas.  
+**Parameter Selection(s):** `r format(Sys.Date()-days(1),"%m/%d/%Y")`  
+***`r colorize("Note: Arrived visit volumes include all arrived/completed in-person and telemedicine visits.","blue")`***  
+----------------------------------------------------------------------------------------------------------------------------
+<br>
+<br>
+<br>
+  
+```{r df, echo=FALSE, message=FALSE, warning=FALSE}
+source('00_Support_Milwaukee.R')
+source('01_Dataframes_Milwaukee.R')
+```
+
+
+```{r clinic_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+#clinic_metrics_df,specialty_clinic_metrics_df,community_services_metrics_df,urgent_emergent_metrics_df,bedded_metrics_df,tarp_summary_metrics_df,
+#surgery_metrics_df,system_metrics_df
+
+clinic_metrics_table %>%
+  mutate(specialty_arrow = case_when(specialty_care_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            specialty_care_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            specialty_care_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            specialty_care_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+    mutate(primary_arrow = case_when(primary_care_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            primary_care_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            primary_care_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            primary_care_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+  select(clinic_metrics2,primary_care_actuals,primary_arrow,primary_care_delta,specialty_care_actuals,specialty_arrow,specialty_care_delta)%>%
+  kbl(col.names = NULL, escape = F, centering=F, align='c') %>%
+  kable_paper(full_width = F, html_font = "Arial", position="left")%>%
+  add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*"),
+                          paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*")),bold=T, underline=T, font_size = 10, align="center")%>%
+  add_header_above(c("Clinic Metrics", "Primary Care"=3, "Specialty Care"=3),bold=T, underline=T, font_size = 14, background="lightgray", align="center", border_left=TRUE,border_right=TRUE)%>%
+footnote(
+    general = c(
+      paste0("<small>*Scheduled visits reflect ", format(Sys.Date(),"%m/%d/%y")," and is compared to the prior 5 ", weekdays(Sys.Date()),"s</small>")
+    ),
+    footnote_as_chunk = T ,
+    escape = F
+)
+   
+```
+<br>
+
+
+```{r specialty_clinic_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+#community_services_metrics_df,urgent_emergent_metrics_df,bedded_metrics_df,tarp_summary_metrics_df,
+#surgery_metrics_df,system_metrics_df
+
+specialty_clinic_metrics_table %>%
+    mutate(mke_campus_arrow2 = case_when(mke_campus_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            mke_campus_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            mke_campus_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            mke_campus_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+    mutate(metro_mke_arrow2 = case_when(metro_mke_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            metro_mke_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            metro_mke_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            metro_mke_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+  select(specialty_clinic_metrics2,mke_campus_actuals,mke_campus_arrow2,mke_campus_delta,metro_mke_actuals,metro_mke_arrow2,metro_mke_delta)%>%
+  kbl(col.names = NULL, escape = F, centering=F, align='c') %>%
+  kable_paper(full_width = F, html_font = "Arial", position="left")%>%
+  add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*"),
+                          paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*")),bold=T, underline=T, font_size = 10, align="center")%>%
+  add_header_above(c("Specialty Clinic Metrics By Location", "Milwaukee Campus"=3, "Metro Milwaukee"=3),bold=T, underline=T, font_size = 14, background="lightgray", align="center", border_left=T,border_right=T)%>%
+footnote(
+    general = c(
+      paste0("<small>*Scheduled visits reflect ", format(Sys.Date(),"%m/%d/%y")," and is compared to the prior 5 ", weekdays(Sys.Date()),"s</small>")
+    ),
+    footnote_as_chunk = T ,
+    escape = F
+)
+  
+   
+```
+<br>
+
+```{r community_services, echo=FALSE, message=FALSE, warning=FALSE}
+#community_services_metrics_df,urgent_emergent_metrics_df,bedded_metrics_df,tarp_summary_metrics_df,
+#surgery_metrics_df,system_metrics_df
+
+community_services_metrics_table %>%
+    mutate(advocacy_arrow2 = case_when(advocacy_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            advocacy_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            advocacy_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            advocacy_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+    mutate(counseling_arrow2 = case_when(counseling_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            counseling_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            counseling_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            counseling_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+  select(community_services_metrics2,advocacy_actuals,advocacy_arrow2,advocacy_delta,counseling_actuals,counseling_arrow2,counseling_delta)%>%
+  kbl(col.names = NULL, escape = F) %>%
+  kable_paper(full_width = F, html_font = "Arial", position="left")%>%
+  add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*"),
+                          paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*")),bold=T, underline=T, font_size = 10, align="center")%>%
+  add_header_above(c("Community Services Metrics", "Advocacy & Protection"=3, "Counseling"=3),bold=T, underline=T, font_size = 14, background="lightgray", align="center", border_left=TRUE,border_right=TRUE)%>%
+footnote(
+    general = c(
+      paste0("<small>*Scheduled visits reflect ", format(Sys.Date(),"%m/%d/%y")," and is compared to the prior 5 ", weekdays(Sys.Date()),"s</small>")
+    ),
+    footnote_as_chunk = T ,
+    escape = F
+)
+   
+``` 
+  
+<br>
+
+```{r urgent_emergent_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+#urgent_emergent_metrics_df,bedded_metrics_df,tarp_summary_metrics_df,
+#surgery_metrics_df,system_metrics_df
+
+urgent_emergent_metrics_table %>%
+      mutate(urgent_care_arrow2 = case_when(urgent_care_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            urgent_care_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            urgent_care_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            urgent_care_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+    mutate(emergency_arrow2 = case_when(emergency_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            emergency_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            emergency_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            emergency_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+  select(urgent_emergent_metrics2,urgent_care_actuals,urgent_care_arrow2,urgent_care_delta,emergency_actuals,emergency_arrow2,emergency_delta)%>%
+  kbl(col.names = NULL, escape = F, align='c') %>%
+  kable_paper(full_width = F, html_font = "Arial", position="left")%>%
+  add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*"),
+                          paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*")),bold=T, underline=T, font_size = 10, align="center")%>%
+  add_header_above(c("Urgent/Emergent Care Metrics", "Urgent Care"=3, "Emergency"=3),bold=T, underline=T, font_size = 14, background="lightgray", align="center", border_left=TRUE,border_right=TRUE)%>%
+footnote(
+    general = c(
+      paste0("<small>*Scheduled visits reflect ", format(Sys.Date(),"%m/%d/%y")," and is compared to the prior 5 ", weekdays(Sys.Date()),"s</small>")
+    ),
+    footnote_as_chunk = T ,
+    escape = F
+)
+   
+```
+<br>
+
+```{r bedded_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+#bedded_metrics_df,tarp_summary_metrics_df,
+#surgery_metrics_df,system_metrics_df
+
+bedded_metrics_table %>%
+      mutate(mke_bed_arrow2 = case_when(mke_bedded_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            mke_bedded_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            mke_bedded_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            mke_bedded_arrow=='right'~paste0(as.character(fa("arrow-right"))),
+            mke_bedded_arrow==" "~ " "))%>%
+  select(bedded_metrics2,mke_bedded_actuals,mke_bed_arrow2,mke_bedded_delta)%>%
+  kbl(col.names = NULL, escape = F, align = 'c') %>%
+  kable_paper(full_width = F, html_font = "Arial", position="left")%>%
+  add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*")),bold=T, underline=T, font_size = 10, align="center")%>%
+  add_header_above(c("Census Metrics", "Milwaukee Campus"=3),bold=T, underline=T, font_size = 14, background="lightgray", align="center", border_left=TRUE,border_right=TRUE)%>%
+footnote(
+    general = c(
+      paste0("<small>*Scheduled visits reflect ", format(Sys.Date(),"%m/%d/%y")," and is compared to the prior 5 ", weekdays(Sys.Date()),"s</small>")
+    ),
+    footnote_as_chunk = T ,
+    escape = F
+)
+   
+```
+<br>
+
+```{r tarp_summary_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+#tarp_summary_metrics_df,
+#surgery_metrics_df,system_metrics_df
+
+tarp_summary_table %>%
+  select(tarp_summary2,Census,Staffing,RN_Variance)%>%
+  kbl(col.names = NULL, escape = F, align = 'c') %>%
+  kable_paper(full_width = F, html_font = "Arial", position="left")%>%
+  add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),
+                          paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),
+                          paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals")),bold=T, underline=T, font_size = 10, align="center")%>%
+  add_header_above(c("TARP Summary - All Bedded", "Census", "Staffing", "RN Variance"),bold=T, underline=T, font_size = 14, background="lightgray", align="center", border_left=TRUE,border_right=TRUE)
+   
+```
+<br>
+
+```{r surgery_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+#surgery_metrics_df,system_metrics_df
+
+surgery_metrics_table %>%
+        mutate(mke_campus_arrow2 = case_when(mke_campus_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            mke_campus_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            mke_campus_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            mke_campus_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+    mutate(surgicenter_arrow2 = case_when(surgicenter_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+            surgicenter_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+            surgicenter_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+            surgicenter_arrow=='right'~paste0(as.character(fa("arrow-right")))))%>%
+  select(surgery_metrics2 ,mke_campus_actuals,mke_campus_arrow2,mke_campus_delta,surgicenter_actuals,surgicenter_arrow2,surgicenter_delta)%>%
+  kbl(col.names = NULL, escape = F, align = 'c') %>%
+  kable_paper(full_width = F, html_font = "Arial", position="left")%>%
+  add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*"),
+                          paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
+                          paste0("%","$\\Delta$", " from Prior \nTime Period*")),bold=T, underline=T, font_size = 10, align="center")%>%
+  add_header_above(c("Surgical Metrics", "Milwaukee Campus"=3, "Surgicenter"=3),bold=T, underline=T, font_size = 14, background="lightgray", align="center", border_left=TRUE,border_right=TRUE)%>%
+footnote(
+    general = c(
+      paste0("<small>*Scheduled visits reflect ", format(Sys.Date(),"%m/%d/%y")," and is compared to the prior 5 ", weekdays(Sys.Date()),"s</small>")
+    ),
+    footnote_as_chunk = T ,
+    escape = F
+)
+   
+```
+<br>
+
+```{r system_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+#system_metrics_df
+
+system_metrics_table %>%
+  select(system_metrics2,mke_campus_actuals)%>%
+  kbl(col.names = NULL, escape = F, align = 'l') %>%
+  kable_paper(full_width = F, html_font = "Arial", position="left")%>%
+  add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals")),bold=T, underline=T, font_size = 10, align="left")%>%
+  add_header_above(c("System Metrics"=2),bold=T, underline=T, font_size = 14, background="lightgray", align="left", border_left=TRUE,border_right=TRUE)
+
+   
+```
+<br>
+Link to Report Methodology Job Aid: <a href="https://insight.chw.org/TrainingCenter/Shared%20Documents/Report%20Center%20Training%20Materials/Daily%20System%20Metrics/Daily%20System%20Metrics.pdf">Daily System Metrics Methodology</a>
+<br>
+If you have any questions, please contact: insight@chw.org
+
+
+<br>
+
+```{r create_email, echo=FALSE, message=FALSE}
+ library(blastula)
+#  #Use the document created to send via RStudio Connect
+render_connect_email(input = "03_DailySystemMetricsMilwaukeeEmail.Rmd",
+                                           connect_footer = FALSE) %>%
+   attach_connect_email(
+     subject = "Daily System Metrics - Milwaukee",
+     attach_output = FALSE,
+     attachments = NULL,
+     preview=TRUE
+   )

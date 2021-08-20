@@ -1,0 +1,35 @@
+---
+title: "DailySystemMetricsMilwaukeeEmail"
+output: blastula::blastula_email
+---
+
+```{r clinic_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+```
+
+```{r specialty_clinic_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+```
+
+```{r community_services, echo=FALSE, message=FALSE, warning=FALSE}
+```
+
+```{r urgent_emergent_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+```
+
+```{r bedded_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+```
+
+```{r tarp_summary_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+```
+
+```{r surgery_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+```
+
+```{r system_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+```
+<br>
+Link to Report Methodology Job Aid: <a href="https://insight.chw.org/TrainingCenter/Shared%20Documents/Report%20Center%20Training%20Materials/Daily%20System%20Metrics/Daily%20System%20Metrics.pdf">Daily System Metrics Methodology</a>
+<br>
+If you have any questions, please contact: insight@chw.org
+
+
+<br>
