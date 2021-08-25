@@ -51,7 +51,7 @@ getResultSet <- function(sql, dbhost) {
 
 
 
-##dsClinics
+##CLINICS
 load_dsClinics <- function(date) {
   sql <- paste0("
   SET NOCOUNT ON
@@ -207,8 +207,6 @@ FROM (
 	)a
 
 
-
-
 SELECT 
 	  SubjectAreaNM
 	, DayOfWeekNM
@@ -255,8 +253,405 @@ INNER JOIN Epic.CHW.KPIImage AS samedayschedulerate	ON t.SameDayScheduleRateArro
 }
 
 
+##SPECIALTY CLINICS
+load_dsSpecialtyClinics <- function(date) {
+  sql <- paste0("
+  SET NOCOUNT ON
+IF OBJECT_ID('tempdb..#temp') IS NOT NULL DROP TABLE #temp
+/*fields beginning with CD will show the current day selected (except for count scheduled which shows the day after), fields beginning wtih PD show prior 5 same day of week. for instance prior 5 Mondays*/
+SELECT 
+  LocationCategory
+, DayOfWeekNM
+, NextDayOfWeekNM
+, CD_CountArrivedVisits    
+, PD_CountArrivedVisits    
+, Delta_CountArrivedVisits
+, CASE WHEN Delta_CountArrivedVisits =0 THEN 'right_grey'
+        WHEN Delta_CountArrivedVisits >0 THEN 'up_green'
+        ELSE 'down_red'
+        END AS CountArrivedVisitsArrow
+, CD_NoShowSameDayCancelRate
+, PD_NoShowSameDayCancelRate
+, Delta_NoShowSameDayCancelRate
+, CASE WHEN Delta_NoShowSameDayCancelRate =0 THEN 'right_grey'
+        WHEN Delta_NoShowSameDayCancelRate >0 THEN 'up_red'
+        ELSE 'down_green'
+        END AS NoShowSameDayCancelRateArrow
+, CD_CountSameDaySchedule
+, PD_CountSameDaySchedule
+, Delta_CountSameDaySchedule
+, CASE WHEN Delta_CountSameDaySchedule =0 THEN 'right_grey'
+        WHEN Delta_CountSameDaySchedule >0 THEN 'up_grey'
+        ELSE 'down_grey'
+        END AS CountSameDayScheduleArrow
+, CD_SameDayScheduleRate
+, PD_SameDayScheduleRate
+, Delta_SameDayScheduleRate
+, CASE WHEN Delta_SameDayScheduleRate =0 THEN 'right_grey'
+        WHEN Delta_SameDayScheduleRate >0 THEN 'up_grey'
+        ELSE 'down_grey'
+        END AS SameDayScheduleRateArrow
+, CD_CountScheduled
+, PD_CountScheduled
+, Delta_CountScheduled
+, CASE WHEN Delta_CountScheduled =0 THEN 'right_grey'
+        WHEN Delta_CountScheduled >0 THEN 'up_green'
+        ELSE 'down_red'
+        END AS CountScheduledArrow
+, CD_AverageLag
+, PD_AverageLag
+, Delta_AverageLag
+, CASE WHEN Delta_AverageLag =0 THEN 'right_grey'
+        WHEN Delta_AverageLag >0 THEN 'up_grey'
+        ELSE 'down_grey'
+        END AS AverageLagArrow
+INTO #temp
+FROM (
+	SELECT LocationCategory
+		,DayofWeekNM
+		,NextDayOfWeekNM
+		,CD_CountArrivedVisits
+		,PD_CountArrivedVisits
+		,CASE WHEN PD_CountArrivedVisits = 0 THEN 0
+			ELSE (CD_CountArrivedVisits - PD_CountArrivedVisits) * 1.0 / PD_CountArrivedVisits * 1.0
+			END AS Delta_CountArrivedVisits
+		,CD_NoShowSameDayCancelRate
+		,PD_NoShowSameDayCancelRate
+		,CD_NoShowSameDayCancelRate - PD_NoShowSameDayCancelRate AS Delta_NoShowSameDayCancelRate
+		, CD_CountSameDaySchedule
+		, PD_CountSameDaySchedule
+		, CASE WHEN PD_CountSameDaySchedule = 0 THEN 0
+			ELSE (CD_CountSameDaySchedule - PD_CountSameDaySchedule) * 1.0 / PD_CountSameDaySchedule * 1.0
+			END AS Delta_CountSameDaySchedule
+		, CD_SameDayScheduleRate  
+		, PD_SameDayScheduleRate      
+		, CD_SameDayScheduleRate   - PD_SameDayScheduleRate   AS Delta_SameDayScheduleRate   
+		,CD_CountScheduled
+		,PD_CountScheduled
+		,CASE WHEN PD_CountScheduled = 0 THEN 0
+			ELSE (CD_CountScheduled - PD_CountScheduled) * 1.0 / PD_CountScheduled * 1.0
+			END AS Delta_CountScheduled
+		,CD_AverageLag
+		,PD_AverageLag
+		,CASE WHEN PD_AverageLag = 0 THEN 0
+			ELSE (CD_AverageLag - PD_AverageLag) * 1.0 / PD_AverageLag * 1.0
+			END AS Delta_AverageLag
+	FROM (
+		SELECT metrics.LocationCategory
+			,curdow.DayofWeekNM
+			,nextdow.DayofWeekNM AS NextDayOfWeekNM
+			,SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) AS CD_CountArrivedVisits
+			,SUM(CASE WHEN ContactDTS <  '", date, "'
+						AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits
+					ELSE 0
+					END) / 5 AS PD_CountArrivedVisits
+			,CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancelDenominator ELSE 0 END) = 0 THEN 0
+				ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancel ELSE 0 END) * 1.0 
+					/ SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancelDenominator ELSE 0 END) * 1.0
+				END AS CD_NoShowSameDayCancelRate
+			,CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancelDenominator ELSE 0 END) = 0 THEN 0
+				ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancel ELSE 0 END) * 1.0 
+					/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancelDenominator ELSE 0 END) * 1.0
+				END AS PD_NoShowSameDayCancelRate
+			, SUM(CASE WHEN ContactDTS = '", date, "'THEN CountSameDaySchedule ELSE 0 END) AS CD_CountSameDaySchedule
+			, SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountSameDaySchedule ELSE 0 END) / 5 AS PD_CountSameDaySchedule  --COMPARE AGAINST 5 SAME DAY OF WEEK PRIOR
+			, CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) = 0 THEN 0
+					ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN CountSameDaySchedule ELSE 0 END) * 1.0
+							/ SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) * 1.0
+					END AS CD_SameDayScheduleRate
+			, CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) = 0 THEN 0
+					ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountSameDaySchedule ELSE 0 END) * 1.0
+							/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) * 1.0
+					END AS PD_SameDayScheduleRate
+			,SUM(CASE WHEN ContactDTS = DATEADD(DD, 1, '", date, "') THEN CountScheduled ELSE 0 END) AS CD_CountScheduled
+			,SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR <> curdow.DayOfWeekIndexNBR THEN CountScheduled ELSE 0 END) / 5 AS PD_CountScheduled
+			,CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN LagDenominator ELSE 0 END) = 0 THEN 0
+				ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN LagNumerator ELSE 0 END) 
+					/ SUM(CASE WHEN ContactDTS = '", date, "' THEN LagDenominator ELSE 0 END)
+				END AS CD_AverageLag
+			,CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN LagDenominator ELSE 0 END) = 0 THEN 0
+				ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN LagNumerator ELSE 0 END) 
+					/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN LagDenominator ELSE 0 END)
+				END AS PD_AverageLag
+		FROM SAM.CommonMetrics.SummaryDailyClinicMetricsBASE AS metrics
+		INNER JOIN Epic.Reference.DateDimensionBASE AS dow ON metrics.ContactDTS = dow.CalendarDT
+		LEFT JOIN Epic.Reference.DateDimensionBASE AS curdow ON '", date, "' = curdow.CalendarDT
+		LEFT JOIN Epic.Reference.DateDimensionBASE AS nextdow ON DATEADD(dd, 1, '", date, "') = nextdow.CalendarDT
+		WHERE (
+				metrics.LocationCategory IN (
+					'Milwaukee Campus'
+					,'Metro Milwaukee'
+					)
+				)
+			AND (metrics.SubjectAreaNM = 'Specialty Care')
+			AND (
+				metrics.ContactDTS >= '", date, "'
+				AND metrics.ContactDTS < DATEADD(dd, 2, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 6, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 7, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 13, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 14, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 20, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 21, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 27, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 28, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 34, '", date, "')
+				OR metrics.ContactDTS = DATEADD(dd, - 35, '", date, "')
+				)
+		GROUP BY metrics.LocationCategory
+			,curdow.DayofWeekNM
+			,nextdow.DayofWeekNM
+		) AS summary
+	) AS a
 
-# ##clinic detail  --need to add after RuleNewPatientBASE is in production
+
+SELECT 
+	  LocationCategory
+	, DayOfWeekNM
+	, NextDayOfWeekNM
+	, CD_CountArrivedVisits
+	, PD_CountArrivedVisits
+	, Delta_CountArrivedVisits
+	, CountArrivedVisitsArrow
+	, arrivedvisits.ImageDSC as CountArrivedVisitsArrowImage
+	, CD_NoShowSameDayCancelRate
+	, PD_NoShowSameDayCancelRate
+	, Delta_NoShowSameDayCancelRate
+	, NoShowSameDayCancelRateArrow
+	, noshowsdc.ImageDSC as NoShowSameDayCancelRateArrowImage
+	, CD_CountScheduled
+	, PD_CountScheduled
+	, Delta_CountScheduled
+	, CountScheduledArrow
+	, scheduled.ImageDSC as CountScheduledArrowImage
+	, CD_CountSameDaySchedule
+	, PD_CountSameDaySchedule
+	, Delta_CountSameDaySchedule
+	, CountSameDayScheduleArrow
+	, samedayschedule.ImageDSC as CountSameDayScheduleArrowImage
+	, CD_SameDayScheduleRate
+	, PD_SameDayScheduleRate
+	, Delta_SameDayScheduleRate
+	, SameDayScheduleRateArrow
+	, samedayschedulerate.ImageDSC as SameDayScheduleRateArrowImage
+	, CD_AverageLag
+	, PD_AverageLag
+	, Delta_AverageLag
+	, AverageLagArrow
+	, lag.ImageDSC as AverageLagArrowImage
+FROM #temp AS t
+INNER JOIN Epic.CHW.KPIImage AS arrivedvisits ON t.CountArrivedVisitsArrow = arrivedvisits.ImageNM 
+INNER JOIN Epic.CHW.KPIImage AS noshowsdc ON t.NoShowSameDayCancelRateArrow = noshowsdc.ImageNM
+INNER JOIN Epic.CHW.KPIImage AS scheduled ON t.CountScheduledArrow = scheduled.ImageNM 
+INNER JOIN Epic.CHW.KPIImage AS lag ON t.AverageLagArrow = lag.ImageNM
+INNER JOIN Epic.CHW.KPIImage AS samedayschedule	ON t.CountSameDayScheduleArrow = samedayschedule.ImageNM
+INNER JOIN Epic.CHW.KPIImage AS samedayschedulerate	ON t.SameDayScheduleRateArrow = samedayschedulerate.ImageNM
+                            ")
+  return(getResultSet(sql, edw_server))
+}
+
+#COMMUNITY SERVICES
+load_dsCommunityServices<-function(date) {
+  sql<-paste0("
+  SET NOCOUNT ON
+IF OBJECT_ID('tempdb..#temp') IS NOT NULL DROP TABLE #temp
+/*fields beginning with CD will show the current day selected (except for count scheduled which shows the day after), fields beginning wtih PD show prior 5 same day of week. for instance prior 5 Mondays*/
+SELECT 
+  SubjectAreaNM
+, DayOfWeekNM
+, NextDayOfWeekNM
+, CD_CountArrivedVisits    
+, PD_CountArrivedVisits    
+, Delta_CountArrivedVisits
+, CASE WHEN Delta_CountArrivedVisits =0 THEN 'right_grey'
+        WHEN Delta_CountArrivedVisits >0 THEN 'up_green'
+        ELSE 'down_red'
+        END AS CountArrivedVisitsArrow
+, CD_NoShowSameDayCancelRate
+, PD_NoShowSameDayCancelRate
+, Delta_NoShowSameDayCancelRate
+, CASE WHEN Delta_NoShowSameDayCancelRate =0 THEN 'right_grey'
+        WHEN Delta_NoShowSameDayCancelRate >0 THEN 'up_red'
+        ELSE 'down_green'
+        END AS NoShowSameDayCancelRateArrow
+, CD_CountSameDaySchedule
+, PD_CountSameDaySchedule
+, Delta_CountSameDaySchedule
+, CASE WHEN Delta_CountSameDaySchedule =0 THEN 'right_grey'
+        WHEN Delta_CountSameDaySchedule >0 THEN 'up_grey'
+        ELSE 'down_grey'
+        END AS CountSameDayScheduleArrow
+, CD_SameDayScheduleRate
+, PD_SameDayScheduleRate
+, Delta_SameDayScheduleRate
+, CASE WHEN Delta_SameDayScheduleRate =0 THEN 'right_grey'
+        WHEN Delta_SameDayScheduleRate >0 THEN 'up_grey'
+        ELSE 'down_grey'
+        END AS SameDayScheduleRateArrow
+, CD_CountScheduled
+, PD_CountScheduled
+, Delta_CountScheduled
+, CASE WHEN Delta_CountScheduled =0 THEN 'right_grey'
+        WHEN Delta_CountScheduled >0 THEN 'up_green'
+        ELSE 'down_red'
+        END AS CountScheduledArrow
+, CD_AverageLag
+, PD_AverageLag
+, Delta_AverageLag
+, CASE WHEN Delta_AverageLag =0 THEN 'right_grey'
+        WHEN Delta_AverageLag >0 THEN 'up_grey'
+        ELSE 'down_grey'
+        END AS AverageLagArrow
+INTO #temp
+FROM (
+	SELECT
+		  SubjectAreaNM	
+		, DayOfWeekNM
+		, NextDayOfWeekNM
+		, CD_CountArrivedVisits	
+		, PD_CountArrivedVisits	
+		, CASE WHEN PD_CountArrivedVisits = 0 THEN 0
+			ELSE (CD_CountArrivedVisits - PD_CountArrivedVisits) * 1.0 / PD_CountArrivedVisits * 1.0
+			END AS Delta_CountArrivedVisits
+		, CD_NoShowSameDayCancelRate	
+		, PD_NoShowSameDayCancelRate	
+		, CD_NoShowSameDayCancelRate - PD_NoShowSameDayCancelRate AS Delta_NoShowSameDayCancelRate	
+		, CD_CountSameDaySchedule
+		, PD_CountSameDaySchedule
+		, CASE WHEN PD_CountSameDaySchedule = 0 THEN 0
+			ELSE (CD_CountSameDaySchedule - PD_CountSameDaySchedule) * 1.0 / PD_CountSameDaySchedule * 1.0
+			END AS Delta_CountSameDaySchedule
+		, CD_SameDayScheduleRate  
+		, PD_SameDayScheduleRate      
+		, CD_SameDayScheduleRate   - PD_SameDayScheduleRate   AS Delta_SameDayScheduleRate   
+		, CD_CountScheduled	
+		, PD_CountScheduled	
+		, CASE WHEN PD_CountScheduled = 0 THEN 0
+			ELSE (CD_CountScheduled - PD_CountScheduled) * 1.0 / PD_CountScheduled * 1.0
+			END AS Delta_CountScheduled
+		, CD_AverageLag	
+		, PD_AverageLag	
+		, CASE WHEN PD_AverageLag = 0 THEN 0
+			ELSE (CD_AverageLag - PD_AverageLag) * 1.0 / PD_AverageLag * 1.0
+			END AS Delta_AverageLag
+	FROM (
+		SELECT 
+			  SubjectAreaNM
+			, curdow.DayOfWeekNM
+			, nextdow.DayOfWeekNM AS NextDayOfWeekNM
+		/*count arrived/completed*/
+			, SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) AS CD_CountArrivedVisits
+			, SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) / 5 AS PD_CountArrivedVisits  --COMPARE AGAINST 5 SAME DAY OF WEEK PRIOR
+
+		/*no show/same day cancel rate*/
+			, CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancelDenominator ELSE 0 END) = 0 THEN 0
+				ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancel ELSE 0 END) * 1.0
+					/ SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancelDenominator ELSE 0 END) * 1.0
+				END AS CD_NoShowSameDayCancelRate
+			, CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancelDenominator ELSE 0 END) = 0 THEN 0
+				ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancel ELSE 0 END) * 1.0
+					/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancelDenominator ELSE 0 END) * 1.0
+				END AS PD_NoShowSameDayCancelRate
+
+		/*same day schedule count*/
+			, SUM(CASE WHEN ContactDTS = '", date, "' THEN CountSameDaySchedule ELSE 0 END) AS CD_CountSameDaySchedule
+			, SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountSameDaySchedule ELSE 0 END) / 5 AS PD_CountSameDaySchedule  --COMPARE AGAINST 5 SAME DAY OF WEEK PRIOR
+
+		/*same day schedule rate*/
+			, CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) = 0 THEN 0
+					ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN CountSameDaySchedule ELSE 0 END) * 1.0
+							/ SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) * 1.0
+					END AS CD_SameDayScheduleRate
+			, CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) = 0 THEN 0
+					ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountSameDaySchedule ELSE 0 END) * 1.0
+							/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) * 1.0
+					END AS PD_SameDayScheduleRate
+
+		/*count scheduled- note this shows the day after the day selected and the prior 5 days (same day of week)*/
+			, SUM(CASE WHEN ContactDTS = DATEADD(DD,1,'", date, "') THEN CountScheduled ELSE 0 END) AS CD_CountScheduled
+			, SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR <> curdow.DayOfWeekIndexNBR THEN CountScheduled ELSE 0 END) / 5 AS PD_CountScheduled  --COMPARE AGAINST PRIOR 5 SAME DAY (AS TOMORROW)
+
+		/*average lag*/
+			, CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN LagDenominator ELSE 0 END) = 0 THEN 0
+				ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN LagNumerator ELSE 0 END) 
+					/ SUM(CASE WHEN ContactDTS = '", date, "' THEN LagDenominator ELSE 0 END)
+				END AS CD_AverageLag
+			, CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR  THEN LagDenominator ELSE 0 END) = 0 THEN 0
+				ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR  THEN LagNumerator ELSE 0 END)
+					/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR  THEN LagDenominator ELSE 0 END)
+				END AS PD_AverageLag
+		FROM SAM.CommonMetrics.SummaryDailyClinicMetricsBASE AS metrics
+		--INNER JOIN SAM.CommonMetrics.RuleDayOfWeekBASE AS dow ON metrics.ContactDTS = dow.CalendarDT
+		INNER JOIN Epic.Reference.DateDimensionBASE AS dow ON metrics.ContactDTS = dow.CalendarDT
+		LEFT JOIN Epic.Reference.DateDimensionBASE AS curdow ON '", date, "' = curdow.CalendarDT  --JOIN TO DATE DIMENSION AGAIN TO DETERMINE DOW OF ANCHOR DATE
+		LEFT JOIN Epic.Reference.DateDimensionBASE AS nextdow ON DATEADD(dd,1,'", date, "') = nextdow.CalendarDT
+		WHERE 1=1
+		AND metrics.LocationCategory IN ('Milwaukee Campus','Metro Milwaukee')
+		AND metrics.SubjectAreaNM IN ('Counseling','Advocacy & Protection')
+		AND	((ContactDTS >= '", date, "' AND ContactDTS < DATEADD(dd,2,'", date, "'))
+			OR ContactDTS = DATEADD(dd,-6,'", date, "')	--prior 5 days same day of week as day after anchor date
+			OR ContactDTS = DATEADD(dd,-7,'", date, "')  --prior 5 days same day of week as anchor date.  ie. prior 5 mondays
+			OR ContactDTS = DATEADD(dd,-13,'", date, "')
+			OR ContactDTS = DATEADD(dd,-14,'", date, "')
+			OR ContactDTS = DATEADD(dd,-20,'", date, "')
+			OR ContactDTS = DATEADD(dd,-21,'", date, "')
+			OR ContactDTS = DATEADD(dd,-27,'", date, "')
+			OR ContactDTS = DATEADD(dd,-28,'", date, "')
+			OR ContactDTS = DATEADD(dd,-34,'", date, "')
+			OR ContactDTS = DATEADD(dd,-35,'", date, "'))
+		GROUP BY 
+			  SubjectAreaNM
+			, curdow.DayOfWeekNM
+			, nextdow.DayOfWeekNM
+		) AS summary
+	) AS a
+
+SELECT 
+	  SubjectAreaNM
+	, DayOfWeekNM
+	, NextDayOfWeekNM
+	, CD_CountArrivedVisits
+	, PD_CountArrivedVisits
+	, Delta_CountArrivedVisits
+	, CountArrivedVisitsArrow
+	, arrivedvisits.ImageDSC as CountArrivedVisitsArrowImage
+	, CD_NoShowSameDayCancelRate
+	, PD_NoShowSameDayCancelRate
+	, Delta_NoShowSameDayCancelRate
+	, NoShowSameDayCancelRateArrow
+	, noshowsdc.ImageDSC as NoShowSameDayCancelRateArrowImage
+	, CD_CountScheduled
+	, PD_CountScheduled
+	, Delta_CountScheduled
+	, CountScheduledArrow
+	, scheduled.ImageDSC as CountScheduledArrowImage
+	, CD_CountSameDaySchedule
+	, PD_CountSameDaySchedule
+	, Delta_CountSameDaySchedule
+	, CountSameDayScheduleArrow
+	, samedayschedule.ImageDSC as CountSameDayScheduleArrowImage
+	, CD_SameDayScheduleRate
+	, PD_SameDayScheduleRate
+	, Delta_SameDayScheduleRate
+	, SameDayScheduleRateArrow
+	, samedayschedulerate.ImageDSC as SameDayScheduleRateArrowImage
+	, CD_AverageLag
+	, PD_AverageLag
+	, Delta_AverageLag
+	, AverageLagArrow
+	, lag.ImageDSC as AverageLagArrowImage
+FROM #temp AS t
+INNER JOIN Epic.CHW.KPIImage AS arrivedvisits ON t.CountArrivedVisitsArrow = arrivedvisits.ImageNM 
+INNER JOIN Epic.CHW.KPIImage AS noshowsdc ON t.NoShowSameDayCancelRateArrow = noshowsdc.ImageNM
+INNER JOIN Epic.CHW.KPIImage AS scheduled ON t.CountScheduledArrow = scheduled.ImageNM 
+INNER JOIN Epic.CHW.KPIImage AS lag ON t.AverageLagArrow = lag.ImageNM
+INNER JOIN Epic.CHW.KPIImage AS samedayschedule	ON t.CountSameDayScheduleArrow = samedayschedule.ImageNM
+INNER JOIN Epic.CHW.KPIImage AS samedayschedulerate	ON t.SameDayScheduleRateArrow = samedayschedulerate.ImageNM
+")
+  return(getResultSet(sql, edw_server))
+}
+
+#URGENT EMERGENT
 load_dsUrgentEmergent <- function(date) {
   sql <- paste0("
   SET NOCOUNT ON
@@ -491,8 +886,8 @@ INNER JOIN Epic.CHW.KPIImage AS lwbs ON t.LeftWithoutSeenRateArrow = lwbs.ImageN
 }
 
 
-load_dsBedded <- function(date) {
-
+#CENSUS
+load_dsCensus <- function(date) {
   sql <- paste0(
     "
   SET NOCOUNT ON
@@ -772,206 +1167,85 @@ INNER JOIN Epic.CHW.KPIImage AS total ON t.TotalCensusArrow = total.ImageNM
 }
 
 
-
-
-##ed detail
-load_dsSpecialtyClinics <- function(date) {
+#CURRENT STAFFING
+load_dsCurrentStaffing <- function(date) {
   sql <- paste0("
-  SET NOCOUNT ON
-IF OBJECT_ID('tempdb..#temp') IS NOT NULL DROP TABLE #temp
-/*fields beginning with CD will show the current day selected (except for count scheduled which shows the day after), fields beginning wtih PD show prior 5 same day of week. for instance prior 5 Mondays*/
-SELECT 
-  LocationCategory
-, DayOfWeekNM
-, NextDayOfWeekNM
-, CD_CountArrivedVisits    
-, PD_CountArrivedVisits    
-, Delta_CountArrivedVisits
-, CASE WHEN Delta_CountArrivedVisits =0 THEN 'right_grey'
-        WHEN Delta_CountArrivedVisits >0 THEN 'up_green'
-        ELSE 'down_red'
-        END AS CountArrivedVisitsArrow
-, CD_NoShowSameDayCancelRate
-, PD_NoShowSameDayCancelRate
-, Delta_NoShowSameDayCancelRate
-, CASE WHEN Delta_NoShowSameDayCancelRate =0 THEN 'right_grey'
-        WHEN Delta_NoShowSameDayCancelRate >0 THEN 'up_red'
-        ELSE 'down_green'
-        END AS NoShowSameDayCancelRateArrow
-, CD_CountSameDaySchedule
-, PD_CountSameDaySchedule
-, Delta_CountSameDaySchedule
-, CASE WHEN Delta_CountSameDaySchedule =0 THEN 'right_grey'
-        WHEN Delta_CountSameDaySchedule >0 THEN 'up_grey'
-        ELSE 'down_grey'
-        END AS CountSameDayScheduleArrow
-, CD_SameDayScheduleRate
-, PD_SameDayScheduleRate
-, Delta_SameDayScheduleRate
-, CASE WHEN Delta_SameDayScheduleRate =0 THEN 'right_grey'
-        WHEN Delta_SameDayScheduleRate >0 THEN 'up_grey'
-        ELSE 'down_grey'
-        END AS SameDayScheduleRateArrow
-, CD_CountScheduled
-, PD_CountScheduled
-, Delta_CountScheduled
-, CASE WHEN Delta_CountScheduled =0 THEN 'right_grey'
-        WHEN Delta_CountScheduled >0 THEN 'up_green'
-        ELSE 'down_red'
-        END AS CountScheduledArrow
-, CD_AverageLag
-, PD_AverageLag
-, Delta_AverageLag
-, CASE WHEN Delta_AverageLag =0 THEN 'right_grey'
-        WHEN Delta_AverageLag >0 THEN 'up_grey'
-        ELSE 'down_grey'
-        END AS AverageLagArrow
-INTO #temp
+SELECT
+	  detail.SubjectAreaNM
+	, detail.ShiftDTS
+	, detail.StartTimeDTS AS ShiftStartTime
+	, detail.ShiftNM
+	, detail.NICUAgreedRNs
+	, CASE WHEN detail.NICUAgreedRNs - detail.NICUDesiredRNs >= -3 THEN 'Green'
+			WHEN detail.NICUAgreedRNs - detail.NICUDesiredRNs >= -4 THEN 'Yellow'
+			ELSE 'Red'
+		END AS NICUStaffingStatus
+	, detail.NICUAgreedRNs - detail.NICUDesiredRNs AS NICURNVariance
+	, detail.PICUAgreedRNs
+	, tarp.PICUStaffingStatus
+	, detail.PICUAgreedRNs - detail.PICUDesiredRNs AS PICURNVariance
+	, detail.AcuteAgreedRNs
+	, tarp.AcuteStaffingStatus
+	, detail.AcuteAgreedRNs - detail.AcuteDesiredRNs AS AcuteRNVariance
+	, detail.NICUCensus
+	, CASE WHEN detail.NICUCensus <= 58 THEN 'Green'
+			WHEN detail.NICUCensus <= 64 THEN 'Yellow'
+			ELSE 'Red'
+		END AS NICUCensusStatus
+	, detail.PICUCensus
+	, tarp.PICUCensusStatus
+	, detail.AcuteCensus
+	, tarp.AcuteCensusStatus
 FROM (
-	SELECT LocationCategory
-		,DayofWeekNM
-		,NextDayOfWeekNM
-		,CD_CountArrivedVisits
-		,PD_CountArrivedVisits
-		,CASE WHEN PD_CountArrivedVisits = 0 THEN 0
-			ELSE (CD_CountArrivedVisits - PD_CountArrivedVisits) * 1.0 / PD_CountArrivedVisits * 1.0
-			END AS Delta_CountArrivedVisits
-		,CD_NoShowSameDayCancelRate
-		,PD_NoShowSameDayCancelRate
-		,CD_NoShowSameDayCancelRate - PD_NoShowSameDayCancelRate AS Delta_NoShowSameDayCancelRate
-		, CD_CountSameDaySchedule
-		, PD_CountSameDaySchedule
-		, CASE WHEN PD_CountSameDaySchedule = 0 THEN 0
-			ELSE (CD_CountSameDaySchedule - PD_CountSameDaySchedule) * 1.0 / PD_CountSameDaySchedule * 1.0
-			END AS Delta_CountSameDaySchedule
-		, CD_SameDayScheduleRate  
-		, PD_SameDayScheduleRate      
-		, CD_SameDayScheduleRate   - PD_SameDayScheduleRate   AS Delta_SameDayScheduleRate   
-		,CD_CountScheduled
-		,PD_CountScheduled
-		,CASE WHEN PD_CountScheduled = 0 THEN 0
-			ELSE (CD_CountScheduled - PD_CountScheduled) * 1.0 / PD_CountScheduled * 1.0
-			END AS Delta_CountScheduled
-		,CD_AverageLag
-		,PD_AverageLag
-		,CASE WHEN PD_AverageLag = 0 THEN 0
-			ELSE (CD_AverageLag - PD_AverageLag) * 1.0 / PD_AverageLag * 1.0
-			END AS Delta_AverageLag
-	FROM (
-		SELECT metrics.LocationCategory
-			,curdow.DayofWeekNM
-			,nextdow.DayofWeekNM AS NextDayOfWeekNM
-			,SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) AS CD_CountArrivedVisits
-			,SUM(CASE WHEN ContactDTS <  '", date, "'
-						AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits
-					ELSE 0
-					END) / 5 AS PD_CountArrivedVisits
-			,CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancelDenominator ELSE 0 END) = 0 THEN 0
-				ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancel ELSE 0 END) * 1.0 
-					/ SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancelDenominator ELSE 0 END) * 1.0
-				END AS CD_NoShowSameDayCancelRate
-			,CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancelDenominator ELSE 0 END) = 0 THEN 0
-				ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancel ELSE 0 END) * 1.0 
-					/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancelDenominator ELSE 0 END) * 1.0
-				END AS PD_NoShowSameDayCancelRate
-			, SUM(CASE WHEN ContactDTS = '", date, "'THEN CountSameDaySchedule ELSE 0 END) AS CD_CountSameDaySchedule
-			, SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountSameDaySchedule ELSE 0 END) / 5 AS PD_CountSameDaySchedule  --COMPARE AGAINST 5 SAME DAY OF WEEK PRIOR
-			, CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) = 0 THEN 0
-					ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN CountSameDaySchedule ELSE 0 END) * 1.0
-							/ SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) * 1.0
-					END AS CD_SameDayScheduleRate
-			, CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) = 0 THEN 0
-					ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountSameDaySchedule ELSE 0 END) * 1.0
-							/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) * 1.0
-					END AS PD_SameDayScheduleRate
-			,SUM(CASE WHEN ContactDTS = DATEADD(DD, 1, '", date, "') THEN CountScheduled ELSE 0 END) AS CD_CountScheduled
-			,SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR <> curdow.DayOfWeekIndexNBR THEN CountScheduled ELSE 0 END) / 5 AS PD_CountScheduled
-			,CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN LagDenominator ELSE 0 END) = 0 THEN 0
-				ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN LagNumerator ELSE 0 END) 
-					/ SUM(CASE WHEN ContactDTS = '", date, "' THEN LagDenominator ELSE 0 END)
-				END AS CD_AverageLag
-			,CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN LagDenominator ELSE 0 END) = 0 THEN 0
-				ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN LagNumerator ELSE 0 END) 
-					/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN LagDenominator ELSE 0 END)
-				END AS PD_AverageLag
-		FROM SAM.CommonMetrics.SummaryDailyClinicMetricsBASE AS metrics
-		INNER JOIN Epic.Reference.DateDimensionBASE AS dow ON metrics.ContactDTS = dow.CalendarDT
-		LEFT JOIN Epic.Reference.DateDimensionBASE AS curdow ON '", date, "' = curdow.CalendarDT
-		LEFT JOIN Epic.Reference.DateDimensionBASE AS nextdow ON DATEADD(dd, 1, '", date, "') = nextdow.CalendarDT
-		WHERE (
-				metrics.LocationCategory IN (
-					'Milwaukee Campus'
-					,'Metro Milwaukee'
-					)
-				)
-			AND (metrics.SubjectAreaNM = 'Specialty Care')
-			AND (
-				metrics.ContactDTS >= '", date, "'
-				AND metrics.ContactDTS < DATEADD(dd, 2, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 6, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 7, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 13, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 14, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 20, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 21, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 27, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 28, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 34, '", date, "')
-				OR metrics.ContactDTS = DATEADD(dd, - 35, '", date, "')
-				)
-		GROUP BY metrics.LocationCategory
-			,curdow.DayofWeekNM
-			,nextdow.DayofWeekNM
-		) AS summary
-	) AS a
-
-
-SELECT 
-	  LocationCategory
-	, DayOfWeekNM
-	, NextDayOfWeekNM
-	, CD_CountArrivedVisits
-	, PD_CountArrivedVisits
-	, Delta_CountArrivedVisits
-	, CountArrivedVisitsArrow
-	, arrivedvisits.ImageDSC as CountArrivedVisitsArrowImage
-	, CD_NoShowSameDayCancelRate
-	, PD_NoShowSameDayCancelRate
-	, Delta_NoShowSameDayCancelRate
-	, NoShowSameDayCancelRateArrow
-	, noshowsdc.ImageDSC as NoShowSameDayCancelRateArrowImage
-	, CD_CountScheduled
-	, PD_CountScheduled
-	, Delta_CountScheduled
-	, CountScheduledArrow
-	, scheduled.ImageDSC as CountScheduledArrowImage
-	, CD_CountSameDaySchedule
-	, PD_CountSameDaySchedule
-	, Delta_CountSameDaySchedule
-	, CountSameDayScheduleArrow
-	, samedayschedule.ImageDSC as CountSameDayScheduleArrowImage
-	, CD_SameDayScheduleRate
-	, PD_SameDayScheduleRate
-	, Delta_SameDayScheduleRate
-	, SameDayScheduleRateArrow
-	, samedayschedulerate.ImageDSC as SameDayScheduleRateArrowImage
-	, CD_AverageLag
-	, PD_AverageLag
-	, Delta_AverageLag
-	, AverageLagArrow
-	, lag.ImageDSC as AverageLagArrowImage
-FROM #temp AS t
-INNER JOIN Epic.CHW.KPIImage AS arrivedvisits ON t.CountArrivedVisitsArrow = arrivedvisits.ImageNM 
-INNER JOIN Epic.CHW.KPIImage AS noshowsdc ON t.NoShowSameDayCancelRateArrow = noshowsdc.ImageNM
-INNER JOIN Epic.CHW.KPIImage AS scheduled ON t.CountScheduledArrow = scheduled.ImageNM 
-INNER JOIN Epic.CHW.KPIImage AS lag ON t.AverageLagArrow = lag.ImageNM
-INNER JOIN Epic.CHW.KPIImage AS samedayschedule	ON t.CountSameDayScheduleArrow = samedayschedule.ImageNM
-INNER JOIN Epic.CHW.KPIImage AS samedayschedulerate	ON t.SameDayScheduleRateArrow = samedayschedulerate.ImageNM
-                            ")
+	SELECT 
+			'Milwaukee' AS SubjectAreaNM
+		, COALESCE(staff.ShiftDTS, census.ShiftDTS) AS ShiftDTS
+		, sh.ShiftNM
+		, sh.ShiftID
+		, sh.StartTimeDTS
+		, sh.FinishTimeDTS
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) = 'NICU' THEN staff.AgreedUponNBR ELSE 0 END) AS NICUAgreedRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) = 'NICU' THEN staff.DesiredNBR ELSE 0 END) AS NICUDesiredRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) = 'NICU' THEN staff.ScheduleID ELSE 0 END) AS NICUScheduledRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('W3','W4','W5') THEN staff.AgreedUponNBR ELSE 0 END) AS PICUAgreedRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('W3','W4','W5') THEN staff.DesiredNBR ELSE 0 END) AS PICUDesiredRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('W3','W4','W5') THEN staff.ScheduleID ELSE 0 END) AS PICUScheduledRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('C4','E5','W7','W9','W10','W11','W12') THEN staff.AgreedUponNBR ELSE 0 END) AS AcuteAgreedRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('C4','E5','W7','W9','W10','W11','W12') THEN staff.DesiredNBR ELSE 0 END) AS AcuteDesiredRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('C4','E5','W7','W9','W10','W11','W12') THEN staff.ScheduleID ELSE 0 END) AS AcuteScheduledRNs
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) = 'NICU' THEN ProjectedCensusNBR ELSE 0 END) AS NICUCensus
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('W3','W4','W5') THEN ProjectedCensusNBR ELSE 0 END) AS PICUCensus
+		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('C4','E5','W7','W9','W10','W11','W12') THEN ProjectedCensusNBR ELSE 0 END) AS AcuteCensus
+	FROM MaestroNew.StaffingPlan.RecommendationBASE AS staff
+	LEFT JOIN MaestroNew.Maintenance.UnitBASE AS unit ON staff.UnitID = unit.UnitID
+	FULL OUTER JOIN MaestroNew.StaffingPlan.CensusBASE AS census ON staff.ShiftID = census.ShiftID
+		AND staff.UnitID = census.UnitID
+		AND staff.ShiftDTS = census.ShiftDTS
+	LEFT JOIN MaestroNew.Maintenance.UnitBASE AS cunit ON census.UnitID = cunit.UnitID
+	LEFT JOIN MaestroNew.Maintenance.ShiftBASE AS sh ON COALESCE(staff.ShiftID, census.ShiftID) = sh.ShiftID
+	WHERE 1=1
+	AND staff.StaffTypeID = '2'  --RNs
+	AND (('", date, "' >= DATEADD(dd,-1,CAST(GETDATE() AS DATE))  --if default date (yesterday) is selected, show most recent shift of curent date
+			AND COALESCE(staff.ShiftDTS, census.ShiftDTS) = CAST(GETDATE() AS DATE)
+			AND CAST(DATEADD(HH,1,GETDATE()) AS TIME) >= CAST(sh.StartTimeDTS AS TIME) AND CAST(DATEADD(HH,1,GETDATE()) AS TIME) <= CAST(sh.FinishTimeDTS AS TIME))		--updated getdate to add 1 hour to account for time change
+		OR ('", date, "' < DATEADD(dd,-1,CAST(GETDATE() AS DATE))  --if prior date is selected, show day 1 shift of that date
+			AND COALESCE(staff.ShiftDTS, census.ShiftDTS) = '", date, "'
+			AND ShiftNM = 'D1 (0700-1100)')
+		)
+	GROUP BY 
+			COALESCE(staff.ShiftDTS, census.ShiftDTS)
+		, sh.ShiftNM
+		, sh.ShiftID
+		, sh.StartTimeDTS
+		, sh.FinishTimeDTS
+	) AS detail
+LEFT JOIN SAM.Maestro.MaestroReportingSummaryMaestroAcuitySumBASE AS tarp ON CAST(detail.ShiftDTS AS DATE) = CAST(tarp.DateDT AS DATE)
+	AND detail.ShiftID = tarp.ShiftID
+                      ")
   return(getResultSet(sql, edw_server))
 }
 
-
+#SURGERY
 load_dsSurgery<-function(date) {
   sql<-paste0("
   SET NOCOUNT ON
@@ -1083,8 +1357,6 @@ FROM (
 		) AS summary
 	) AS a
 
-
-
 SELECT 
 	  SubjectAreaNM	
 	, DayOfWeekNM
@@ -1119,6 +1391,7 @@ INNER JOIN Epic.CHW.KPIImage AS cancelrate ON t.SameDayCancelRateArrow = cancelr
 }
 
 
+#SYSTEM
 load_dsSystem<-function(date) {
   sql<-paste0("
 	SELECT 
@@ -1154,286 +1427,6 @@ load_dsSystem<-function(date) {
 return(getResultSet(sql, edw_server))
 }
 
-
-
-load_dsCurrentStaffing <- function(date) {
-  sql <- paste0("
-SELECT
-	  detail.SubjectAreaNM
-	, detail.ShiftDTS
-	, detail.StartTimeDTS AS ShiftStartTime
-	, detail.ShiftNM
-	, detail.NICUAgreedRNs
-	, CASE WHEN detail.NICUAgreedRNs - detail.NICUDesiredRNs >= -3 THEN 'Green'
-			WHEN detail.NICUAgreedRNs - detail.NICUDesiredRNs >= -4 THEN 'Yellow'
-			ELSE 'Red'
-		END AS NICUStaffingStatus
-	, detail.NICUAgreedRNs - detail.NICUDesiredRNs AS NICURNVariance
-	, detail.PICUAgreedRNs
-	, tarp.PICUStaffingStatus
-	, detail.PICUAgreedRNs - detail.PICUDesiredRNs AS PICURNVariance
-	, detail.AcuteAgreedRNs
-	, tarp.AcuteStaffingStatus
-	, detail.AcuteAgreedRNs - detail.AcuteDesiredRNs AS AcuteRNVariance
-	, detail.NICUCensus
-	, CASE WHEN detail.NICUCensus <= 58 THEN 'Green'
-			WHEN detail.NICUCensus <= 64 THEN 'Yellow'
-			ELSE 'Red'
-		END AS NICUCensusStatus
-	, detail.PICUCensus
-	, tarp.PICUCensusStatus
-	, detail.AcuteCensus
-	, tarp.AcuteCensusStatus
-FROM (
-	SELECT 
-			'Milwaukee' AS SubjectAreaNM
-		, COALESCE(staff.ShiftDTS, census.ShiftDTS) AS ShiftDTS
-		, sh.ShiftNM
-		, sh.ShiftID
-		, sh.StartTimeDTS
-		, sh.FinishTimeDTS
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) = 'NICU' THEN staff.AgreedUponNBR ELSE 0 END) AS NICUAgreedRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) = 'NICU' THEN staff.DesiredNBR ELSE 0 END) AS NICUDesiredRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) = 'NICU' THEN staff.ScheduleID ELSE 0 END) AS NICUScheduledRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('W3','W4','W5') THEN staff.AgreedUponNBR ELSE 0 END) AS PICUAgreedRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('W3','W4','W5') THEN staff.DesiredNBR ELSE 0 END) AS PICUDesiredRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('W3','W4','W5') THEN staff.ScheduleID ELSE 0 END) AS PICUScheduledRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('C4','E5','W7','W9','W10','W11','W12') THEN staff.AgreedUponNBR ELSE 0 END) AS AcuteAgreedRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('C4','E5','W7','W9','W10','W11','W12') THEN staff.DesiredNBR ELSE 0 END) AS AcuteDesiredRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('C4','E5','W7','W9','W10','W11','W12') THEN staff.ScheduleID ELSE 0 END) AS AcuteScheduledRNs
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) = 'NICU' THEN ProjectedCensusNBR ELSE 0 END) AS NICUCensus
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('W3','W4','W5') THEN ProjectedCensusNBR ELSE 0 END) AS PICUCensus
-		, SUM(CASE WHEN COALESCE(unit.NameNM, cunit.NameNM) IN ('C4','E5','W7','W9','W10','W11','W12') THEN ProjectedCensusNBR ELSE 0 END) AS AcuteCensus
-	FROM MaestroNew.StaffingPlan.RecommendationBASE AS staff
-	LEFT JOIN MaestroNew.Maintenance.UnitBASE AS unit ON staff.UnitID = unit.UnitID
-	FULL OUTER JOIN MaestroNew.StaffingPlan.CensusBASE AS census ON staff.ShiftID = census.ShiftID
-		AND staff.UnitID = census.UnitID
-		AND staff.ShiftDTS = census.ShiftDTS
-	LEFT JOIN MaestroNew.Maintenance.UnitBASE AS cunit ON census.UnitID = cunit.UnitID
-	LEFT JOIN MaestroNew.Maintenance.ShiftBASE AS sh ON COALESCE(staff.ShiftID, census.ShiftID) = sh.ShiftID
-	WHERE 1=1
-	AND staff.StaffTypeID = '2'  --RNs
-	AND (('", date, "' >= DATEADD(dd,-1,CAST(GETDATE() AS DATE))  --if default date (yesterday) is selected, show most recent shift of curent date
-			AND COALESCE(staff.ShiftDTS, census.ShiftDTS) = CAST(GETDATE() AS DATE)
-			AND CAST(DATEADD(HH,1,GETDATE()) AS TIME) >= CAST(sh.StartTimeDTS AS TIME) AND CAST(DATEADD(HH,1,GETDATE()) AS TIME) <= CAST(sh.FinishTimeDTS AS TIME))		--updated getdate to add 1 hour to account for time change
-		OR ('", date, "' < DATEADD(dd,-1,CAST(GETDATE() AS DATE))  --if prior date is selected, show day 1 shift of that date
-			AND COALESCE(staff.ShiftDTS, census.ShiftDTS) = '", date, "'
-			AND ShiftNM = 'D1 (0700-1100)')
-		)
-	GROUP BY 
-			COALESCE(staff.ShiftDTS, census.ShiftDTS)
-		, sh.ShiftNM
-		, sh.ShiftID
-		, sh.StartTimeDTS
-		, sh.FinishTimeDTS
-	) AS detail
-LEFT JOIN SAM.Maestro.MaestroReportingSummaryMaestroAcuitySumBASE AS tarp ON CAST(detail.ShiftDTS AS DATE) = CAST(tarp.DateDT AS DATE)
-	AND detail.ShiftID = tarp.ShiftID
-                      ")
-  return(getResultSet(sql, edw_server))
-}
-
-
-load_dsCommunityServices<-function(date) {
-  sql<-paste0("
-  SET NOCOUNT ON
-IF OBJECT_ID('tempdb..#temp') IS NOT NULL DROP TABLE #temp
-/*fields beginning with CD will show the current day selected (except for count scheduled which shows the day after), fields beginning wtih PD show prior 5 same day of week. for instance prior 5 Mondays*/
-SELECT 
-  SubjectAreaNM
-, DayOfWeekNM
-, NextDayOfWeekNM
-, CD_CountArrivedVisits    
-, PD_CountArrivedVisits    
-, Delta_CountArrivedVisits
-, CASE WHEN Delta_CountArrivedVisits =0 THEN 'right_grey'
-        WHEN Delta_CountArrivedVisits >0 THEN 'up_green'
-        ELSE 'down_red'
-        END AS CountArrivedVisitsArrow
-, CD_NoShowSameDayCancelRate
-, PD_NoShowSameDayCancelRate
-, Delta_NoShowSameDayCancelRate
-, CASE WHEN Delta_NoShowSameDayCancelRate =0 THEN 'right_grey'
-        WHEN Delta_NoShowSameDayCancelRate >0 THEN 'up_red'
-        ELSE 'down_green'
-        END AS NoShowSameDayCancelRateArrow
-, CD_CountSameDaySchedule
-, PD_CountSameDaySchedule
-, Delta_CountSameDaySchedule
-, CASE WHEN Delta_CountSameDaySchedule =0 THEN 'right_grey'
-        WHEN Delta_CountSameDaySchedule >0 THEN 'up_grey'
-        ELSE 'down_grey'
-        END AS CountSameDayScheduleArrow
-, CD_SameDayScheduleRate
-, PD_SameDayScheduleRate
-, Delta_SameDayScheduleRate
-, CASE WHEN Delta_SameDayScheduleRate =0 THEN 'right_grey'
-        WHEN Delta_SameDayScheduleRate >0 THEN 'up_grey'
-        ELSE 'down_grey'
-        END AS SameDayScheduleRateArrow
-, CD_CountScheduled
-, PD_CountScheduled
-, Delta_CountScheduled
-, CASE WHEN Delta_CountScheduled =0 THEN 'right_grey'
-        WHEN Delta_CountScheduled >0 THEN 'up_green'
-        ELSE 'down_red'
-        END AS CountScheduledArrow
-, CD_AverageLag
-, PD_AverageLag
-, Delta_AverageLag
-, CASE WHEN Delta_AverageLag =0 THEN 'right_grey'
-        WHEN Delta_AverageLag >0 THEN 'up_grey'
-        ELSE 'down_grey'
-        END AS AverageLagArrow
-INTO #temp
-FROM (
-	SELECT
-		  SubjectAreaNM	
-		, DayOfWeekNM
-		, NextDayOfWeekNM
-		, CD_CountArrivedVisits	
-		, PD_CountArrivedVisits	
-		, CASE WHEN PD_CountArrivedVisits = 0 THEN 0
-			ELSE (CD_CountArrivedVisits - PD_CountArrivedVisits) * 1.0 / PD_CountArrivedVisits * 1.0
-			END AS Delta_CountArrivedVisits
-		, CD_NoShowSameDayCancelRate	
-		, PD_NoShowSameDayCancelRate	
-		, CD_NoShowSameDayCancelRate - PD_NoShowSameDayCancelRate AS Delta_NoShowSameDayCancelRate	
-		, CD_CountSameDaySchedule
-		, PD_CountSameDaySchedule
-		, CASE WHEN PD_CountSameDaySchedule = 0 THEN 0
-			ELSE (CD_CountSameDaySchedule - PD_CountSameDaySchedule) * 1.0 / PD_CountSameDaySchedule * 1.0
-			END AS Delta_CountSameDaySchedule
-		, CD_SameDayScheduleRate  
-		, PD_SameDayScheduleRate      
-		, CD_SameDayScheduleRate   - PD_SameDayScheduleRate   AS Delta_SameDayScheduleRate   
-		, CD_CountScheduled	
-		, PD_CountScheduled	
-		, CASE WHEN PD_CountScheduled = 0 THEN 0
-			ELSE (CD_CountScheduled - PD_CountScheduled) * 1.0 / PD_CountScheduled * 1.0
-			END AS Delta_CountScheduled
-		, CD_AverageLag	
-		, PD_AverageLag	
-		, CASE WHEN PD_AverageLag = 0 THEN 0
-			ELSE (CD_AverageLag - PD_AverageLag) * 1.0 / PD_AverageLag * 1.0
-			END AS Delta_AverageLag
-	FROM (
-		SELECT 
-			  SubjectAreaNM
-			, curdow.DayOfWeekNM
-			, nextdow.DayOfWeekNM AS NextDayOfWeekNM
-		/*count arrived/completed*/
-			, SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) AS CD_CountArrivedVisits
-			, SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) / 5 AS PD_CountArrivedVisits  --COMPARE AGAINST 5 SAME DAY OF WEEK PRIOR
-
-		/*no show/same day cancel rate*/
-			, CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancelDenominator ELSE 0 END) = 0 THEN 0
-				ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancel ELSE 0 END) * 1.0
-					/ SUM(CASE WHEN ContactDTS = '", date, "' THEN CountNoShowSameDayCancelDenominator ELSE 0 END) * 1.0
-				END AS CD_NoShowSameDayCancelRate
-			, CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancelDenominator ELSE 0 END) = 0 THEN 0
-				ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancel ELSE 0 END) * 1.0
-					/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountNoShowSameDayCancelDenominator ELSE 0 END) * 1.0
-				END AS PD_NoShowSameDayCancelRate
-
-		/*same day schedule count*/
-			, SUM(CASE WHEN ContactDTS = '", date, "' THEN CountSameDaySchedule ELSE 0 END) AS CD_CountSameDaySchedule
-			, SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountSameDaySchedule ELSE 0 END) / 5 AS PD_CountSameDaySchedule  --COMPARE AGAINST 5 SAME DAY OF WEEK PRIOR
-
-		/*same day schedule rate*/
-			, CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) = 0 THEN 0
-					ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN CountSameDaySchedule ELSE 0 END) * 1.0
-							/ SUM(CASE WHEN ContactDTS = '", date, "' THEN CountArrivedVisits ELSE 0 END) * 1.0
-					END AS CD_SameDayScheduleRate
-			, CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) = 0 THEN 0
-					ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountSameDaySchedule ELSE 0 END) * 1.0
-							/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR THEN CountArrivedVisits ELSE 0 END) * 1.0
-					END AS PD_SameDayScheduleRate
-
-		/*count scheduled- note this shows the day after the day selected and the prior 5 days (same day of week)*/
-			, SUM(CASE WHEN ContactDTS = DATEADD(DD,1,'", date, "') THEN CountScheduled ELSE 0 END) AS CD_CountScheduled
-			, SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR <> curdow.DayOfWeekIndexNBR THEN CountScheduled ELSE 0 END) / 5 AS PD_CountScheduled  --COMPARE AGAINST PRIOR 5 SAME DAY (AS TOMORROW)
-
-		/*average lag*/
-			, CASE WHEN SUM(CASE WHEN ContactDTS = '", date, "' THEN LagDenominator ELSE 0 END) = 0 THEN 0
-				ELSE SUM(CASE WHEN ContactDTS = '", date, "' THEN LagNumerator ELSE 0 END) 
-					/ SUM(CASE WHEN ContactDTS = '", date, "' THEN LagDenominator ELSE 0 END)
-				END AS CD_AverageLag
-			, CASE WHEN SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR  THEN LagDenominator ELSE 0 END) = 0 THEN 0
-				ELSE SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR  THEN LagNumerator ELSE 0 END)
-					/ SUM(CASE WHEN ContactDTS < '", date, "' AND dow.DayOfWeekIndexNBR = curdow.DayOfWeekIndexNBR  THEN LagDenominator ELSE 0 END)
-				END AS PD_AverageLag
-		FROM SAM.CommonMetrics.SummaryDailyClinicMetricsBASE AS metrics
-		--INNER JOIN SAM.CommonMetrics.RuleDayOfWeekBASE AS dow ON metrics.ContactDTS = dow.CalendarDT
-		INNER JOIN Epic.Reference.DateDimensionBASE AS dow ON metrics.ContactDTS = dow.CalendarDT
-		LEFT JOIN Epic.Reference.DateDimensionBASE AS curdow ON '", date, "' = curdow.CalendarDT  --JOIN TO DATE DIMENSION AGAIN TO DETERMINE DOW OF ANCHOR DATE
-		LEFT JOIN Epic.Reference.DateDimensionBASE AS nextdow ON DATEADD(dd,1,'", date, "') = nextdow.CalendarDT
-		WHERE 1=1
-		AND metrics.LocationCategory IN ('Milwaukee Campus','Metro Milwaukee')
-		AND metrics.SubjectAreaNM IN ('Counseling','Advocacy & Protection')
-		AND	((ContactDTS >= '", date, "' AND ContactDTS < DATEADD(dd,2,'", date, "'))
-			OR ContactDTS = DATEADD(dd,-6,'", date, "')	--prior 5 days same day of week as day after anchor date
-			OR ContactDTS = DATEADD(dd,-7,'", date, "')  --prior 5 days same day of week as anchor date.  ie. prior 5 mondays
-			OR ContactDTS = DATEADD(dd,-13,'", date, "')
-			OR ContactDTS = DATEADD(dd,-14,'", date, "')
-			OR ContactDTS = DATEADD(dd,-20,'", date, "')
-			OR ContactDTS = DATEADD(dd,-21,'", date, "')
-			OR ContactDTS = DATEADD(dd,-27,'", date, "')
-			OR ContactDTS = DATEADD(dd,-28,'", date, "')
-			OR ContactDTS = DATEADD(dd,-34,'", date, "')
-			OR ContactDTS = DATEADD(dd,-35,'", date, "'))
-		GROUP BY 
-			  SubjectAreaNM
-			, curdow.DayOfWeekNM
-			, nextdow.DayOfWeekNM
-		) AS summary
-	) AS a
-
-SELECT 
-	  SubjectAreaNM
-	, DayOfWeekNM
-	, NextDayOfWeekNM
-	, CD_CountArrivedVisits
-	, PD_CountArrivedVisits
-	, Delta_CountArrivedVisits
-	, CountArrivedVisitsArrow
-	, arrivedvisits.ImageDSC as CountArrivedVisitsArrowImage
-	, CD_NoShowSameDayCancelRate
-	, PD_NoShowSameDayCancelRate
-	, Delta_NoShowSameDayCancelRate
-	, NoShowSameDayCancelRateArrow
-	, noshowsdc.ImageDSC as NoShowSameDayCancelRateArrowImage
-	, CD_CountScheduled
-	, PD_CountScheduled
-	, Delta_CountScheduled
-	, CountScheduledArrow
-	, scheduled.ImageDSC as CountScheduledArrowImage
-	, CD_CountSameDaySchedule
-	, PD_CountSameDaySchedule
-	, Delta_CountSameDaySchedule
-	, CountSameDayScheduleArrow
-	, samedayschedule.ImageDSC as CountSameDayScheduleArrowImage
-	, CD_SameDayScheduleRate
-	, PD_SameDayScheduleRate
-	, Delta_SameDayScheduleRate
-	, SameDayScheduleRateArrow
-	, samedayschedulerate.ImageDSC as SameDayScheduleRateArrowImage
-	, CD_AverageLag
-	, PD_AverageLag
-	, Delta_AverageLag
-	, AverageLagArrow
-	, lag.ImageDSC as AverageLagArrowImage
-FROM #temp AS t
-INNER JOIN Epic.CHW.KPIImage AS arrivedvisits ON t.CountArrivedVisitsArrow = arrivedvisits.ImageNM 
-INNER JOIN Epic.CHW.KPIImage AS noshowsdc ON t.NoShowSameDayCancelRateArrow = noshowsdc.ImageNM
-INNER JOIN Epic.CHW.KPIImage AS scheduled ON t.CountScheduledArrow = scheduled.ImageNM 
-INNER JOIN Epic.CHW.KPIImage AS lag ON t.AverageLagArrow = lag.ImageNM
-INNER JOIN Epic.CHW.KPIImage AS samedayschedule	ON t.CountSameDayScheduleArrow = samedayschedule.ImageNM
-INNER JOIN Epic.CHW.KPIImage AS samedayschedulerate	ON t.SameDayScheduleRateArrow = samedayschedulerate.ImageNM
-")
-  return(getResultSet(sql, edw_server))
-}
-
 load_dsPassFailCheck <- function(date) {
   sql <- paste0("SELECT CASE WHEN MAX(EndDTS) < CAST(GETDATE() AS DATE) THEN 'Fail'
 	ELSE 'Pass'
@@ -1446,7 +1439,7 @@ load_dsPassFailCheck <- function(date) {
 }
 
 
-
+#ERROR MESSAGE
 loadErrorMessage<-function(date) {
   sql <- paste0("SELECT
 	  DowntimeMessage
@@ -1462,7 +1455,7 @@ WHERE RANK = 1
   return(getResultSet(sql, edw_server))
 }
 
-
+#PASS FAIL CHECK
 load_dsStaffingPassFailCheck<-function(date) {
   sql<-paste0("--DECLARE @email VARCHAR(1) = '1'
 

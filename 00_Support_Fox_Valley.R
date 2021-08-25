@@ -50,7 +50,8 @@ getResultSet <- function(sql, dbhost) {
 # }
 
 
-load_dsFVBedded <- function(date) {
+#CENSUS
+load_dsFVCensus <- function(date) {
   
   sql <- paste0(
     "
@@ -330,6 +331,7 @@ INNER JOIN Epic.CHW.KPIImage AS total ON t.TotalCensusArrow = total.ImageNM
 }
 
 
+#SPECIALTY
 load_dsFVSpecialtyClinics <- function(date) {
   
   sql <- paste0(
@@ -529,6 +531,7 @@ INNER JOIN Epic.CHW.KPIImage AS samedayschedulerate	ON t.SameDayScheduleRateArro
   return(getResultSet(sql, edw_server))
 }
 
+#EXPERIENCE
 load_dsFVExperience <- function(date) {
   
   sql <- paste0(
@@ -561,6 +564,7 @@ GROUP BY  patexpcomment.Comment
   return(getResultSet(sql, edw_server))
 }
 
+#DOWNTIME
 load_dsDownTimeMessage <- function(date) {
   sql <- paste0(
     "SET NOCOUNT ON

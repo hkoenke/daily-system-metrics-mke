@@ -11,11 +11,3 @@ output: blastula::blastula_email
 
 ```{r experience_metrics, echo=FALSE, message=FALSE, warning=FALSE}
 ```
-<br>
-Link to report and metric definitions: <a href=https://insight.chw.org/RC/_layouts/15/ReportServer/RSViewerPage.aspx?rv:RelativeReportUrl=/RC/Reports1/General/Daily%20System%20Metrics%20-%20Fox%20Valley.rdl&Source=https%3A%2F%2Finsight%2Echw%2Eorg%2FRC%2FReports1%2FForms%2FAllItems%2Easpx%3FRootFolder%3D%252fRC%252fReports1%252fGeneral%26FolderCTID%3D0x012000B9A5438CD9EB614FB56F44D2C2E696B8%23InplviewHash501d9041%2Db2cc%2D4c45%2Da468%2Dffc6cc1a624e%3DFolderCTID%253D0x012000B9A5438CD9EB614FB56F44D2C2E696B8%2DFilterField1%253DInitial%2DFilterValue1%253DD>Daily System Metrics - Fox Valley</a>
-<br>
-Link to Report Methodology Job Aid: <a href="https://insight.chw.org/TrainingCenter/Shared%20Documents/Report%20Center%20Training%20Materials/Daily%20System%20Metrics/Daily%20System%20Metrics.pdf">Daily System Metrics Methodology</a>
-<br>
-If you have any questions, please contact: insight@chw.org
-
-<br>
