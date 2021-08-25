@@ -19,7 +19,8 @@ library(scales)
 library(forcats)
 library(fontawesome)
 library(gt)
-
+library(sjmisc)
+library(magick)
  date1<-as.Date("2021-07-06") 
 date2<-as.Date(Sys.Date()-days(1)) 
 
@@ -711,28 +712,29 @@ f6<-c(paste0("NICU (as of ", shift_start$tarp, ")"), paste0("PICU (as of ", shif
       paste0("Acute (as of ", shift_start$tarp, ")"))
 
 tarp_census<-currentstaffing_df%>%
-        filter(tarp_summary=="NICUCensus"|
-                       tarp_summary=="PICUCensus"|
-                       tarp_summary=="AcuteCensus")%>%
-        mutate(tarp_summary2=
-                       case_when(tarp_summary=="NICUCensus"~paste0("NICU (as of ", shift_start$tarp, ")"),
-                                 tarp_summary=="PICUCensus"~paste0("PICU (as of ", shift_start$tarp, ")"),
-                                 tarp_summary=="AcuteCensus"~paste0("Acute (as of ", shift_start$tarp, ")")))%>%
-        arrange(factor(tarp_summary2,f6))%>%
-        rename(Census=tarp)%>%
-        select(tarp_summary2,Census)
+  filter(tarp_summary=="NICUCensus"|
+           tarp_summary=="PICUCensus"|
+           tarp_summary=="AcuteCensus")%>%
+  mutate(tarp_summary2=
+           case_when(tarp_summary=="NICUCensus"~paste0("NICU (as of ", shift_start$tarp, ")"),
+                     tarp_summary=="PICUCensus"~paste0("PICU (as of ", shift_start$tarp, ")"),
+                     tarp_summary=="AcuteCensus"~paste0("Acute (as of ", shift_start$tarp, ")")                               
+           ))%>%
+  arrange(factor(tarp_summary2,f6))%>%
+  rename(Census=tarp)%>%
+  select(tarp_summary2,Census)
 
 tarp_staffing<-currentstaffing_df%>%
-        filter(tarp_summary=="NICUAgreedRNs"|
-                       tarp_summary=="PICUAgreedRNs"|
-                       tarp_summary=="AcuteAgreedRNs")%>%
-        mutate(tarp_summary2=
-                       case_when(tarp_summary=="NICUAgreedRNs"~paste0("NICU (as of ", shift_start$tarp, ")"),
-                                 tarp_summary=="PICUAgreedRNs"~paste0("PICU (as of ", shift_start$tarp, ")"),
-                                 tarp_summary=="AcuteAgreedRNs"~paste0("PICU (as of ", shift_start$tarp, ")")))%>%
-        arrange(factor(tarp_summary2,f6))%>%
-        select(tarp)%>%
-        rename(Staffing=tarp)
+  filter(tarp_summary=="NICUAgreedRNs"|
+           tarp_summary=="PICUAgreedRNs"|
+           tarp_summary=="AcuteAgreedRNs")%>%
+  mutate(tarp_summary2=
+           case_when(tarp_summary=="NICUAgreedRNs"~paste0("NICU (as of ", shift_start$tarp, ")"),
+                     tarp_summary=="PICUAgreedRNs"~paste0("PICU (as of ", shift_start$tarp, ")"),
+                     tarp_summary=="AcuteAgreedRNs"~paste0("PICU (as of ", shift_start$tarp, ")")))%>%
+  arrange(factor(tarp_summary2,f6))%>%
+  select(tarp)%>%
+  rename(Staffing=tarp)
 
 tarp_variance<-currentstaffing_df%>%
         filter(tarp_summary=="NICURNVariance"|
@@ -746,7 +748,33 @@ tarp_variance<-currentstaffing_df%>%
         select(tarp)%>%
         rename(RN_Variance=tarp)
 
-tarp_summary_table<-cbind(tarp_census, tarp_staffing, tarp_variance)
+tarp_census_color<-currentstaffing_df%>%
+  filter(tarp_summary=="NICUCensusStatus"|
+           tarp_summary=="PICUCensusStatus"|
+           tarp_summary=="AcuteCensusStatus")%>%
+  mutate(tarp_summary2=
+           case_when(tarp_summary=="NICUCensusStatus"~paste0("NICU (as of ", shift_start$tarp, ")"),
+                     tarp_summary=="PICUCensusStatus"~paste0("PICU (as of ", shift_start$tarp, ")"),
+                     tarp_summary=="AcuteCensusStatus"~paste0("Acute (as of ", shift_start$tarp, ")")                               
+           ))%>%
+  arrange(factor(tarp_summary2,f6))%>%
+  rename(census_color=tarp)%>%
+  select(census_color)
+
+tarp_staffing_color<-currentstaffing_df%>%
+  filter(tarp_summary=="NICUStaffingStatus"|
+           tarp_summary=="PICUStaffingStatus"|
+           tarp_summary=="AcuteStaffingStatus")%>%
+mutate(tarp_summary2=
+         case_when(tarp_summary=="NICUStaffingStatus"~paste0("NICU (as of ", shift_start$tarp, ")"),
+                   tarp_summary=="PICUStaffingStatus"~paste0("PICU (as of ", shift_start$tarp, ")"),
+                   tarp_summary=="AcuteStaffingStatus"~paste0("Acute (as of ", shift_start$tarp, ")")                               
+         ))%>%
+  arrange(factor(tarp_summary2,f6))%>%
+  rename(staffing_color=tarp)%>%
+  select(staffing_color)
+
+tarp_summary_table<-cbind(tarp_census, tarp_census_color,tarp_staffing, tarp_staffing_color,tarp_variance)
 tarp_summary_metrics_df<-rbind(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y")),
                                     paste0("%","$\\Delta$", "from Prior Time Period"), 
                                     paste0(format(Sys.Date()-days(1),"%m/%d/%y")),

@@ -10,10 +10,11 @@ edw_server <- 'cwwi-edwprod.cwwi.hosted'
 #
 # Helper function to create a data set with from the passed in SQL statement 
 # and database name
-# getResultSet <- function(sql, dbhost) {
+getResultSet <- function(sql, dbhost) {
 
   con_string <- paste0("Driver=SQLServer;Server=", dbhost ,";Database=Epic;",
-                       "UID=", Sys.getenv('EDW_USERNAME'), ";PWD=", Sys.getenv('EDW_PASSWORD'),
+                       "UID=", 
+                       Sys.getenv('EDW_USERNAME'), ";PWD=", Sys.getenv('EDW_PASSWORD'),
                        ";Integrated Security=true;",
                        "Trusted_Connection=NTLM")
 
@@ -21,21 +22,13 @@ edw_server <- 'cwwi-edwprod.cwwi.hosted'
   con <- dbConnect(odbc::odbc(), encoding = "latin1",
                    .connection_string=con_string)
 
-  results_df <- dbGetQuery(con, sql)
+  results_df <- dbGetQuery(con, sql, immediate=TRUE)
 
   # disconnect from the database
   dbDisconnect(con)
 
-#   return(results_df)
-# }
-  
-  con_string <- paste0("Driver=SQLServer;Server=cwwi-edwprod.cwwi.hosted;Database=Epic;",
-                       "UID=", Sys.getenv('EDW_USERNAME'), ";PWD=", Sys.getenv('EDW_PASSWORD'),
-                       ";Integrated Security=true;",
-                       "Trusted_Connection=NTLM")
-  
-  con <- dbConnect(odbc::odbc(), encoding = "latin1",
-                   .connection_string=con_string)
+  return(results_df)
+ }
   
   
 # edw_server <- 'cwwi-edwprod.cwwi.hosted'
