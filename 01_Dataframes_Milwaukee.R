@@ -583,7 +583,7 @@ emergency_delta<-urgentemergent_df%>%
 emergency_arrow<-urgentemergent_df%>%
   select(urgent_emergent_metrics,emergency)%>%
   filter(urgent_emergent_metrics=="CountVisitsArrow"|
-         ugent_emergent_metrics=="HigherLevelOfCareRateArrow"|
+         urgent_emergent_metrics=="HigherLevelOfCareRateArrow"|
          urgent_emergent_metrics=="AverageThroughputArrow"|
          urgent_emergent_metrics=="LeftWithoutSeenRateArrow")%>%
   mutate(urgent_emergent_metrics2=

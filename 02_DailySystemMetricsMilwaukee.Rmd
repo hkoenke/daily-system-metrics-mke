@@ -162,14 +162,14 @@ urgent_emergent_metrics_table %>%
 ```
 <br>
 
-```{r bedded_metrics, echo=FALSE, message=FALSE, warning=FALSE}
-bedded_metrics_table %>%
-      mutate(mke_bed_arrow2 = case_when(mke_bedded_arrow=='up'~paste0(as.character(fa("arrow-up"))),
-             mke_bedded_arrow=='down'~paste0(as.character(fa("arrow-down"))),
-             mke_bedded_arrow=='left'~paste0(as.character(fa("arrow-left"))),
-             mke_bedded_arrow=='right'~paste0(as.character(fa("arrow-right"))),
-             mke_bedded_arrow==" "~ " "))%>%
-  select(bedded_metrics2,mke_bedded_actuals,mke_bed_arrow2,mke_bedded_delta)%>%
+```{r census_metrics, echo=FALSE, message=FALSE, warning=FALSE}
+census_metrics_table %>%
+      mutate(mke_census_arrow2 = case_when(mke_census_arrow=='up'~paste0(as.character(fa("arrow-up"))),
+             mke_census_arrow=='down'~paste0(as.character(fa("arrow-down"))),
+             mke_census_arrow=='left'~paste0(as.character(fa("arrow-left"))),
+             mke_census_arrow=='right'~paste0(as.character(fa("arrow-right"))),
+             mke_census_arrow==" "~ " "))%>%
+  select(census_metrics2,mke_census_actuals,mke_census_arrow2,mke_census_delta)%>%
   kbl(col.names = NULL, escape = F, align = 'c') %>%
   kable_paper(full_width = F, html_font = "Arial", position="left")%>%
   add_header_above(c(" ", paste0(format(Sys.Date()-days(1),"%m/%d/%y"), " \nActuals"),"",
